@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy import ndimage
 
 from skimage import img_as_ubyte
 from skimage.util import img_as_float
@@ -9,6 +10,7 @@ from skimage.segmentation import clear_border
 from skimage.measure import label
 from skimage.morphology import closing, square, disk
 from skimage.color import label2rgb
+from skimage.transform import rescale
 
 
 def frequency_filter(im, mu, sigma, passtype='low'):
@@ -101,7 +103,7 @@ def phalloidin_488_binary(im, mu=500, sigma=70, cutoff=0, gain=100):
     return im_con_lo_bin
 
 
-def colorize(image, i):
+def colorize(image, i, x):
     """
     Signature: colorize(*args)
     Docstring: segment and label image
@@ -121,17 +123,20 @@ def colorize(image, i):
             greyscale image
     i : int
         dimension of square to be used for binarization
-
+    x : float
+        dimension of image in microns according to imageJ
     Returns:
     --------
-    RGB image
-    int : 3D ndarray
-          shape of image
+    RGB image overlay
+    int : 2D ndarray
     """
+    #resizing image
+    image = rescale(image, x/1024, anti_aliasing=False)
     #applying threshold to image
     thresh = threshold_triangle(image)
     binary = closing(image > thresh, square(i))
-
+    binary = ndimage.binary_fill_holes(binary)
+    
     #cleaning up boundaries of cells
     cleared = clear_border(binary)
 
@@ -148,7 +153,7 @@ def colorize(image, i):
     ax.set_axis_off()
     plt.tight_layout()
     plt.show()
-
+    return (label_image)
 
 def sharpen_nuclei(image, selem=square(8), ksize=10, alpha=0.2, sigma=40,
                    imshow=True):
