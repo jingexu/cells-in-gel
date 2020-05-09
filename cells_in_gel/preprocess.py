@@ -7,7 +7,7 @@ from skimage.exposure import adjust_sigmoid
 from skimage.filters import threshold_otsu, threshold_triangle, rank, laplace
 from skimage.segmentation import clear_border
 from skimage.measure import label
-from skimage.morphology import closing, square, disk
+from skimage.morphology import closing, square, disk, remove_small_objects
 from skimage.color import label2rgb
 
 
@@ -57,9 +57,12 @@ def frequency_filter(im, mu, sigma, passtype='low'):
     return im_pass
 
 
-def phalloidin_488_binary(im, mu=500, sigma=70, cutoff=0, gain=100):
+def phalloidin_488_segment(im, mu=500, sigma=70, cutoff=0, gain=100,
+                          min_size=250, connectivity=1):
     """
-    This function binarizes a phalloidin 488 fluorescence microscopy channel.
+    This function binarizes a phalloidin 488 fluorescence microscopy channel
+    using contrast adjustment, high pass filter, otsu thresholding, and removal
+    of small objects.
 
     Paramters
     ---------
@@ -75,30 +78,45 @@ def phalloidin_488_binary(im, mu=500, sigma=70, cutoff=0, gain=100):
         Average for input in low pass filter. Default value is 500.
     sigma : float, optional
         Standard deviation for input in low pass filter. Default value is 70.
+    min_size : int, optional
+        The smallest allowable object size. Default value is 250.
+    connectivity : int, optional
+        The connectvitivy defining the neighborhood of a pixel. Default value
+        is 1.
 
     Returns
     -------
-    out : ndarray
-        Contrast adjusted, low pass filtered, binarized output image.
+    out : label_image (ndarray) segmented and object labeled for analysis,
+        image_label_overlay (ndarray)
 
     Examples
     --------
     >>> image = plt.imread('..\C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
-    >>> binary = phalloidin_488_binary(image, mu=500, sigma=70, cutoff=0,
-                                       gain=100)
+    >>> label, overaly = phalloidin_488_binary(image, mu=500, sigma=70,
+                                               cutoff=0, gain=100)
 
     """
     # contrast adjustment
-    im_con = adjust_sigmoid(im, cutoff=0, gain=100, inv=False)
+    im_con = adjust_sigmoid(im, cutoff=cutoff, gain=gain, inv=False)
 
     # contrast + low pass filter
-    im_con_lo = frequency_filter(im_con, mu, sigma, passtype='low')
+    im_lo = frequency_filter(im_con, mu, sigma, passtype='low')
 
     # contrast + low pass + binary
-    thresh_lo = threshold_otsu(im_con_lo, nbins=256)
-    im_con_lo_bin = im_con_lo > thresh_lo
+    thresh = threshold_otsu(im_lo, nbins=256)
+    im_bin = im_lo > thresh
 
-    return im_con_lo_bin
+    # remove small objects
+    im_bin_clean = remove_small_objects(im_bin, min_size=min_size,
+                                        connectivity=connectivity,
+                                        in_place=False)
+    # labelling regions that are cells
+    label_image = label(im_bin_clean)
+
+    # coloring labels over cells
+    image_label_overlay = label2rgb(label_image, image=im, bg_label=0)
+
+    return label_image, image_label_overlay
 
 
 def colorize(image, i):
