@@ -57,7 +57,7 @@ def frequency_filter(im, mu, sigma, passtype='low'):
     return im_pass
 
 
-def phalloidin_labeled(im, x, mu=500, sigma=70, cutoff=0, gain=100,
+def phalloidin_labeled(im, mu=500, sigma=70, cutoff=0, gain=100,
                        min_size=250, connectivity=1):
     """
     Signature: phalloidin_labeled(*args)
@@ -78,8 +78,6 @@ def phalloidin_labeled(im, x, mu=500, sigma=70, cutoff=0, gain=100,
     ---------
     im : (N, M) ndarray
         Grayscale input image.
-    x : float
-        The dimension of image in microns according to imageJ.
     cutoff : float, optional
         Cutoff of the sigmoid function that shifts the characteristic curve
         in horizontal direction. Default value is 0.
@@ -103,7 +101,7 @@ def phalloidin_labeled(im, x, mu=500, sigma=70, cutoff=0, gain=100,
     Examples
     --------
     >>> image = plt.imread('C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
-    >>> label_image = phalloidin_488_binary(image, 200, mu=500, sigma=70,
+    >>> label_image = phalloidin_488_binary(image, mu=500, sigma=70,
                                             cutoff=0, gain=100)
     """
     # contrast adjustment
