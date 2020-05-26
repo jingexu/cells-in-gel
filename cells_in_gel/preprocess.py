@@ -4,11 +4,10 @@ from scipy import ndimage
 
 from skimage import img_as_ubyte
 from skimage.exposure import adjust_sigmoid
-from skimage.filters import threshold_otsu, threshold_triangle, rank, laplace
+from skimage.filters import threshold_otsu, rank, laplace
 from skimage.measure import label
-from skimage.morphology import square, remove_small_objects
+from skimage.morphology import square, disk, remove_small_objects, opening
 from skimage.color import label2rgb
-from skimage.transform import rescale
 
 
 def frequency_filter(im, mu, sigma, passtype='low'):
@@ -57,7 +56,7 @@ def frequency_filter(im, mu, sigma, passtype='low'):
     return im_pass
 
 
-def phalloidin_labeled(im, mu=500, sigma=70, cutoff=0, gain=100,
+def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
                        min_size=250, connectivity=1):
     """
     Signature: phalloidin_labeled(*args)
@@ -78,6 +77,9 @@ def phalloidin_labeled(im, mu=500, sigma=70, cutoff=0, gain=100,
     ---------
     im : (N, M) ndarray
         Grayscale input image.
+    selem : numpy.ndarray, optional
+        Area used for separating cells. Default value is
+        skimage.morphology.disk(3).
     cutoff : float, optional
         Cutoff of the sigmoid function that shifts the characteristic curve
         in horizontal direction. Default value is 0.
@@ -116,9 +118,10 @@ def phalloidin_labeled(im, mu=500, sigma=70, cutoff=0, gain=100,
     # thresh = threshold_triangle(im)
     im_bin = im_lo > thresh
 
-    # fill holes and remove small objects
+    # fill holes, separate cells, and remove small objects
     im_fill = ndimage.binary_fill_holes(im_bin)
-    im_clean = remove_small_objects(im_fill, min_size=min_size,
+    im_open = opening(im_fill, selem)
+    im_clean = remove_small_objects(im_open, min_size=min_size,
                                     connectivity=connectivity, in_place=False)
 
     # labelling regions that are cells
