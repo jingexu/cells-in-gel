@@ -4,7 +4,7 @@ from scipy import ndimage
 
 from skimage import img_as_ubyte
 from skimage.exposure import adjust_sigmoid
-from skimage.filters import threshold_otsu, rank, laplace
+from skimage.filters import threshold_otsu, threshold_triangle, rank, laplace
 from skimage.measure import label
 from skimage.morphology import square, remove_small_objects
 from skimage.color import label2rgb
@@ -103,6 +103,7 @@ def phalloidin_labeled(im, mu=500, sigma=70, cutoff=0, gain=100,
     >>> image = plt.imread('C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
     >>> label_image = phalloidin_488_binary(image, mu=500, sigma=70,
                                             cutoff=0, gain=100)
+
     """
     # contrast adjustment
     im_con = adjust_sigmoid(im, cutoff=cutoff, gain=gain, inv=False)
@@ -112,6 +113,7 @@ def phalloidin_labeled(im, mu=500, sigma=70, cutoff=0, gain=100,
 
     # contrast + low pass + binary
     thresh = threshold_otsu(im_lo, nbins=256)
+    # thresh = threshold_triangle(im)
     im_bin = im_lo > thresh
 
     # fill holes and remove small objects
