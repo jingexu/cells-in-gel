@@ -17,22 +17,30 @@ def max_projection(files):
 
     Parameters
     ----------
-    files : 2D array with str inputs
+    files : list, str
+        A list of filenames each corresponding to z-stack images.
 
     Returns
     -------
     dictionary with filename as the key and max intensity projection as
     the entry
+
+    Example
+    -------
+    files = glob.glob('*.tif')
+    max_proj = max_projection(files)
     '''
-    # read images into a dictionary - one entry per file
+    # empty dictionary for image stacks
     stacks = {}
 
+    # read images into a dictionary - one entry per file
     for file in files:
         stacks[file] = io.imread(file)
 
-    # find the max projection of each stack
+    # empty dictionary for max projections
     max_proj = {}
 
+    # find the max projection of each stack
     for file in files:
         max_proj[file] = np.max(stacks[file], axis=0)
 
@@ -42,15 +50,27 @@ def max_projection(files):
 def labels_regions(files, selem=disk(3), min_size=250):
     '''
     This function labels objects in max projections and returns region
-    properties for each image.
+    properties for each image in a dictionary.
 
     Parameters
     ----------
-    files : 2D array with str inputs
+    files : list, str
+        A list of filenames each corresponding to z-stack images.
+    selem : numpy.ndarray, optional
+        Area used for separating cells. Default value is
+        skimage.morphology.disk(3).
+    min_size : int, optional
+        The smallest allowable object size. Default value is 250.
 
     Returns
     -------
-    dictionary of pandas dataframes corresponding to each max projection
+    dictionary with filename as the key and region properties dataframe as
+    the entry
+
+    Example
+    -------
+    files = glob.glob('*.tif')
+    regions = labels_regions(files)
     '''
     # create empty dictionaries
     labels = {}
@@ -59,63 +79,83 @@ def labels_regions(files, selem=disk(3), min_size=250):
     # find max projection
     max_proj = max_projection(files)
 
+    # preprocessing and segmentation
     for file in files:
         labels[file] = pp.phalloidin_labeled(max_proj[file], selem=selem,
                                              min_size=min_size)
 
+    # extract region properties
     for file in files:
         regions[file] = props.im_properties(labels[file], max_proj[file])
 
     return regions
 
 
-def image_summaries(files, properties, regions):
+def image_summaries(files, properties, titles, regions):
     '''
-    This funciton returns a final dataframe that summarizes average values
-    for each max projection.
+    This funciton returns a final dataframe that summarizes average values and
+    variance for each max projection. Dataframe includes group conditions and
+    properties of interest.
 
     Paramters
     ---------
-    files : 2D array
-
-    properties : 2D array (example: properties = ['area', 'eccentricity'])
-
+    files : list, str
+        A list of filenames each corresponding to z-stack images.
+    properties : list, str
+        A list of properties of interest for further analysis between groups.
+    titles : list, str
+        A list of titles that are descriptors for categories between
+        underscores in filenames.
     regions : output from labels_regions function
 
     Returns
     -------
-    pandas dataframe including average values from each max projection 
+    Pandas dataframe including average values from each max projection.
+
+    Example
+    -------
+    files = glob.glob('*.tif')
+    properties = ['area', 'eccentricity', 'extent',
+                  'major_axis_length', 'minor_axis_length',
+                  'mean_intesntiy']
+    titles = ['celltype', 'ecmtype_conc', 'rgd_conc', 'mag', 'img_num']
+    regions = labels_regions(files, selem=disk(3), min_size=250)
+
+    summary = image_summaries(files, properties, titles, regions)
     '''
+    # empty dictionary for summary of each image
     summary = {}
 
     for file in files:
+
+        # split filename by _
         avg = file.split('_')
+
         for prop in properties:
+
+            # find mean and variance of max projection property
             avg_prop = np.mean(regions[file][prop])
-            sd_prop = np.std(regions[file][prop])
-            sem_prop = sd_prop/(len(regions[file]))**(1/2)
+            var_prop = np.var(regions[file][prop])
 
+            # add properties to list with filename details
             avg.append(avg_prop)
-            avg.append(sd_prop)
-            avg.append(sem_prop)
+            avg.append(var_prop)
 
+        # average properties with max projection into dictionary
         summary[file] = avg
 
-    titles = ['celltype', 'ecmtype_conc', 'rgd_conc', 'mag', 'img_num']
     for prop in properties:
 
-        sd_i = [prop]
-        sd_i.append('_sd')
-        sd = ''.join(sd_i)
+        # add variance to property label
+        var_i = [prop]
+        var_i.append('_var')
+        var = ''.join(var_i)
 
-        sem_i = [prop]
-        sem_i.append('_sem')
-        sem = ''.join(sem_i)
-
+        # append titles to include properties with variance
         titles.append(prop)
-        titles.append(sd)
-        titles.append(sem)
+        titles.append(var)
 
+    # create pandas dataframe
     df_avg = pd.DataFrame.from_dict(summary, orient='index', columns=titles)
     df_r = df_avg.reset_index()
     df = df_r.drop(columns=['index'])
