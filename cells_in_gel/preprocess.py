@@ -3,11 +3,14 @@ import numpy as np
 from scipy import ndimage
 
 from skimage import img_as_ubyte
+from skimage.util import img_as_float
 from skimage.exposure import adjust_sigmoid
-from skimage.filters import threshold_otsu, rank, laplace
+from skimage.filters import threshold_otsu, threshold_triangle, rank, laplace
+from skimage.segmentation import clear_border
 from skimage.measure import label
-from skimage.morphology import square, disk, remove_small_objects, opening
+from skimage.morphology import closing, square, disk, remove_small_objects
 from skimage.color import label2rgb
+from skimage.transform import rescale
 
 
 def frequency_filter(im, mu, sigma, passtype='low'):
@@ -32,7 +35,7 @@ def frequency_filter(im, mu, sigma, passtype='low'):
 
     Examples
     --------
-    >>> image = plt.imread('C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
+    >>> image = plt.imread('..\C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
     >>> lowpass = frequency_filter(im, 500, 70, passtype='low')
     '''
     # define x and y based on image shape
@@ -56,30 +59,17 @@ def frequency_filter(im, mu, sigma, passtype='low'):
     return im_pass
 
 
-def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
-                       min_size=250, connectivity=1):
+def phalloidin_488_segment(im, mu=500, sigma=70, cutoff=0, gain=100,
+                           min_size=250, connectivity=1):
     """
-    Signature: phalloidin_labeled(*args)
-    Docstring: Segment and label image
-
-    Extended Summary
-    ----------------
-    The colorize function applies preprocessing filters (contrast and high
-    pass) then defines the threshold value for the desired image. Thresholding
-    is calculated by the otsu function creates a binarized image by setting
-    pixel intensities above that thresh value to white, and the ones below to
-    black (background). Next, it cleans up the image by filling in random noise
-    within the cell outlines and removes small background objects. It then
-    labels adjacent pixels with the same value and defines them as a region.
-    It returns an RGB image with color-coded labels.
+    This function binarizes a phalloidin 488 fluorescence microscopy channel
+    using contrast adjustment, high pass filter, otsu thresholding, and removal
+    of small objects.
 
     Paramters
     ---------
     im : (N, M) ndarray
         Grayscale input image.
-    selem : numpy.ndarray, optional
-        Area used for separating cells. Default value is
-        skimage.morphology.disk(3).
     cutoff : float, optional
         Cutoff of the sigmoid function that shifts the characteristic curve
         in horizontal direction. Default value is 0.
@@ -98,13 +88,14 @@ def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
 
     Returns
     -------
-    out : label_image (ndarray) segmented and object labeled for analysis
+    out : label_image (ndarray) segmented and object labeled for analysis,
+        image_label_overlay (ndarray)
 
     Examples
     --------
-    >>> image = plt.imread('C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
-    >>> label_image = phalloidin_488_binary(image, mu=500, sigma=70,
-                                            cutoff=0, gain=100)
+    >>> image = plt.imread('..\C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
+    >>> label, overaly = phalloidin_488_binary(image, mu=500, sigma=70,
+                                               cutoff=0, gain=100)
 
     """
     # contrast adjustment
@@ -115,30 +106,71 @@ def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
 
     # contrast + low pass + binary
     thresh = threshold_otsu(im_lo, nbins=256)
-    # thresh = threshold_triangle(im)
     im_bin = im_lo > thresh
 
-    # fill holes, separate cells, and remove small objects
-    im_fill = ndimage.binary_fill_holes(im_bin)
-    im_open = opening(im_fill, selem)
-    im_clean = remove_small_objects(im_open, min_size=min_size,
-                                    connectivity=connectivity, in_place=False)
-
+    # remove small objects
+    im_bin_clean = remove_small_objects(im_bin, min_size=min_size,
+                                        connectivity=connectivity,
+                                        in_place=False)
     # labelling regions that are cells
-    label_image = label(im_clean)
+    label_image = label(im_bin_clean)
 
     # coloring labels over cells
     image_label_overlay = label2rgb(label_image, image=im, bg_label=0)
+
+    return label_image, image_label_overlay
+
+
+def colorize(image, i, x):
+    """
+    Signature: colorize(*args)
+    Docstring: segment and label image
+    Extended Summary:
+    ----------------
+    The colorize function defines the threshold value for the desired image by
+    the triangle function and then creates a binarized image by setting pixel
+    intensities above that thresh value to white, and the ones below to black
+    (background). Next, it closes up the image by filling in random noise
+    within the cell outlines and smooths/clears out the border. It then labels
+    adjacent pixels with the same value and defines them as a region. It
+    returns an RGB image with color-coded labels.
+
+    Parameters:
+    ----------
+    image : 2D array
+            greyscale image
+    i : int
+        dimension of square to be used for binarization
+    x : float
+        dimension of image in microns according to imageJ
+    Returns:
+    --------
+    RGB image overlay
+    int : 2D ndarray
+    """
+    # resizing image
+    image = rescale(image, x/1024, anti_aliasing=False)
+    # applying threshold to image
+    thresh = threshold_triangle(image)
+    binary = closing(image > thresh, square(i))
+    binary = ndimage.binary_fill_holes(binary)
+
+    # cleaning up boundaries of cells
+    cleared = clear_border(binary)
+
+    # labelling regions that are cells
+    label_image = label(cleared)
+
+    # coloring labels over cells
+    image_label_overlay = label2rgb(label_image, image=image, bg_label=0)
     print(image_label_overlay.shape)
 
-    # plot overlay image
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.imshow(image_label_overlay)
 
     ax.set_axis_off()
     plt.tight_layout()
     plt.show()
-
     return (label_image)
 
 
@@ -154,7 +186,7 @@ def sharpen_nuclei(image, selem=square(8), ksize=10, alpha=0.2, sigma=40,
     Parameters
     ----------
     image : numpy.ndarray
-        one-color channel image which needs to enhance the nucleis.
+        grayscale image which needs to enhance the nucleis.
     selem : numpy.ndarray
         area used for scanning in blurring, default to be square(8).
     ksize : int
@@ -166,23 +198,10 @@ def sharpen_nuclei(image, selem=square(8), ksize=10, alpha=0.2, sigma=40,
     imshow : bool, str
         users choose whether to show the processed images, default to be True.
 
-    Examples
+    Returns
     ----------
-    >>>sharpen_nuclei(image_nuclei, imshow=False)
-    [array([[0, 0, 0, ..., 0, 0, 0],
-        [0, 0, 0, ..., 0, 0, 0],
-        [0, 0, 0, ..., 0, 0, 0],
-        ...,
-        [0, 0, 0, ..., 0, 0, 0],
-        [0, 0, 0, ..., 0, 0, 0],
-        [0, 0, 0, ..., 0, 0, 0]]),
-    array([[0, 0, 0, ..., 0, 0, 0],
-        [0, 0, 0, ..., 0, 0, 0],
-        [0, 0, 0, ..., 0, 0, 0],
-        ...,
-        [0, 0, 0, ..., 0, 0, 0],
-        [0, 0, 0, ..., 0, 0, 0],
-        [0, 0, 0, ..., 0, 0, 0]])]
+    Return to 2 processed grayscale images with sharpened nucleis(2 dimension arrays)
+    in the image using two different sharpening styles.
     """
     image = img_as_ubyte(image)
 
@@ -250,3 +269,75 @@ def sharpen_nuclei(image, selem=square(8), ksize=10, alpha=0.2, sigma=40,
         pass
 
     return [f1, f2]
+
+
+def enhance_nucleis(image, open_selem=disk(5), image_display=True):
+    """
+    Highlight nucleis in the image.
+    Make a sharp contrast between nucleis and background to highlight nucleis
+    in the input image, achieved by opening, dilation, sobel, watershed, and threshod. 
+    Selem have default values while could be customize by user.
+
+    Parameters
+    ----------
+    image : numpy.ndarray
+        grayscale image which needs to enhance the nucleis.
+    selem : numpy.ndarray
+        area used for opening process, default to be disk(5).
+    image_display : bool, str
+        users choose whether to show the enhanced images, default to be True.
+    ----------
+
+    Return
+    ----------
+    Return a processed grayscale image(2 dimension array) with enhanced nucleis.
+
+    """
+
+    im1 = img_as_ubyte(image)
+    im_open = m.opening(im1, open_selem)
+    elevation_map = img_as_ubyte(m.dilation(sobel(im_open)), disk(4))
+    im2 = m.watershed(elevation_map, im_open)
+    im22 = (im2 > otsu(im2))*1
+    im3 = m.erosion((fillholes(elevation_map))*1, disk(2))
+
+    if image_display == True:
+        fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+        ax[0].imshow(im22, cmap='gray')
+        ax[1].imshow(im3, cmap='gray')
+        ax[0].set_title('method1', fontsize=20)
+        ax[1].set_title('method2', fontsize=20)
+        ax[0].axis('off')
+        ax[1].axis('off')
+    else:
+        pass
+
+    return im22
+
+
+def list_of_images(image_channel):
+    """
+    Automatically extract all the images belonging to a channel into a list
+
+    Parameters
+    ----------
+    image_channel : str
+        the channel of which user wants to extract images
+    ----------
+
+    Returns
+    ----------
+    Return to a list composed of all images belonging to a channel
+
+    """
+    mypath = '/content/drive/My Drive/Fibroblasts in PEG Gels with NTG I61Q exm/20x TIFFs/Channel Separated'
+    namelist = []
+    tifflist = []
+    for root, dirs, files in os.walk(mypath):
+        for name in files:
+            if name[0:2] == image_channel:
+                namelist.append(name)
+                j = os.path.join(root, name)
+                tifflist.append(j)
+
+    return tifflist
