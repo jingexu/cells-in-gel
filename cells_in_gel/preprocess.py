@@ -1,16 +1,20 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import ndimage
+from scipy.ndimage import binary_fill_holes as fillholes
 
 from skimage import img_as_ubyte
 from skimage.util import img_as_float
 from skimage.exposure import adjust_sigmoid
-from skimage.filters import threshold_otsu, threshold_triangle, rank, laplace
+from skimage.filters import threshold_otsu, threshold_triangle, rank, laplace, sobel
 from skimage.segmentation import clear_border
 from skimage.measure import label
-from skimage.morphology import closing, square, disk, remove_small_objects
-from skimage.color import label2rgb
+from skimage.morphology import closing, square, disk, remove_small_objects, opening, dilation, watershed, erosion
+from skimage.color import label2rgb, rgb2gray
 from skimage.transform import rescale
+import os
+from os.path import join
+from scipy import ndimage as ndi
 
 
 def frequency_filter(im, mu, sigma, passtype='low'):
@@ -59,17 +63,125 @@ def frequency_filter(im, mu, sigma, passtype='low'):
     return im_pass
 
 
-def phalloidin_488_segment(im, mu=500, sigma=70, cutoff=0, gain=100,
-                           min_size=250, connectivity=1):
+def _check_dtype_supported(ar):
+    '''
+    Used in remove_large_objects function and taken from
+    skimage.morphology package.
+    '''
+    # Should use `issubdtype` for bool below, but there's a bug in numpy 1.7
+    if not (ar.dtype == bool or np.issubdtype(ar.dtype, np.integer)):
+        raise TypeError("Only bool or integer image types are supported. "
+                        "Got %s." % ar.dtype)
+
+
+def remove_large_objects(ar, max_size=10000, connectivity=1, in_place=False):
+    '''
+    Remove connected components larger than the specified size. (Modified from
+    skimage.morphology.remove_small_objects)
+
+    Parameters
+    ----------
+    ar : ndarray (arbitrary shape, int or bool type)
+        The array containing the connected components of interest. If the array
+        type is int, it is assumed that it contains already-labeled objects.
+        The ints must be non-negative.
+    max_size : int, optional (default: 10000)
+        The largest allowable connected component size.
+    connectivity : int, {1, 2, ..., ar.ndim}, optional (default: 1)
+        The connectivity defining the neighborhood of a pixel.
+    in_place : bool, optional (default: False)
+        If `True`, remove the connected components in the input array itself.
+        Otherwise, make a copy.
+    Raises
+    ------
+    TypeError
+        If the input array is of an invalid type, such as float or string.
+    ValueError
+        If the input array contains negative values.
+    Returns
+    -------
+    out : ndarray, same shape and type as input `ar`
+        The input array with small connected components removed.
+    Examples
+    --------
+    >>> from skimage import morphology
+    >>> a = np.array([[0, 0, 0, 1, 0],
+    ...               [1, 1, 1, 0, 0],
+    ...               [1, 1, 1, 0, 1]], bool)
+    >>> b = morphology.remove_large_objects(a, 6)
+    >>> b
+    array([[False, False, False, False, False],
+           [ True,  True,  True, False, False],
+           [ True,  True,  True, False, False]], dtype=bool)
+    >>> c = morphology.remove_small_objects(a, 7, connectivity=2)
+    >>> c
+    array([[False, False, False,  True, False],
+           [ True,  True,  True, False, False],
+           [ True,  True,  True, False, False]], dtype=bool)
+    >>> d = morphology.remove_large_objects(a, 6, in_place=True)
+    >>> d is a
+    True
+    '''
+    # Raising type error if not int or bool
+    _check_dtype_supported(ar)
+
+    if in_place:
+        out = ar
+    else:
+        out = ar.copy()
+
+    if max_size == 0:  # shortcut for efficiency
+        return out
+
+    if out.dtype == bool:
+        selem = ndi.generate_binary_structure(ar.ndim, connectivity)
+        ccs = np.zeros_like(ar, dtype=np.int32)
+        ndi.label(ar, selem, output=ccs)
+    else:
+        ccs = out
+
+    try:
+        component_sizes = np.bincount(ccs.ravel())
+    except ValueError:
+        raise ValueError("Negative value labels are not supported. Try "
+                         "relabeling the input with `scipy.ndimage.label` or "
+                         "`skimage.morphology.label`.")
+
+    if len(component_sizes) == 2:
+        warn("Only one label was provided to `remove_small_objects`. "
+             "Did you mean to use a boolean array?")
+
+    too_large = component_sizes > max_size
+    too_large_mask = too_large[ccs]
+    out[too_large_mask] = 0
+
+    return out
+
+
+def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
+                       min_size=250, max_size=10000, connectivity=1):
     """
-    This function binarizes a phalloidin 488 fluorescence microscopy channel
-    using contrast adjustment, high pass filter, otsu thresholding, and removal
-    of small objects.
+    Signature: phalloidin_labeled(*args)
+    Docstring: Segment and label image
+
+    Extended Summary
+    ----------------
+    The colorize function applies preprocessing filters (contrast and high
+    pass) then defines the threshold value for the desired image. Thresholding
+    is calculated by the otsu function creates a binarized image by setting
+    pixel intensities above that thresh value to white, and the ones below to
+    black (background). Next, it cleans up the image by filling in random noise
+    within the cell outlines and removes small background objects. It then
+    labels adjacent pixels with the same value and defines them as a region.
+    It returns an RGB image with color-coded labels.
 
     Paramters
     ---------
     im : (N, M) ndarray
         Grayscale input image.
+    selem : numpy.ndarray, optional
+        Area used for separating cells. Default value is
+        skimage.morphology.disk(3).
     cutoff : float, optional
         Cutoff of the sigmoid function that shifts the characteristic curve
         in horizontal direction. Default value is 0.
@@ -82,20 +194,21 @@ def phalloidin_488_segment(im, mu=500, sigma=70, cutoff=0, gain=100,
         Standard deviation for input in low pass filter. Default value is 70.
     min_size : int, optional
         The smallest allowable object size. Default value is 250.
+    max_size : int, optional
+        The largest allowable object size. Default value is 10000.
     connectivity : int, optional
         The connectvitivy defining the neighborhood of a pixel. Default value
         is 1.
 
     Returns
     -------
-    out : label_image (ndarray) segmented and object labeled for analysis,
-        image_label_overlay (ndarray)
+    out : label_image (ndarray) segmented and object labeled for analysis
 
     Examples
     --------
-    >>> image = plt.imread('..\C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
-    >>> label, overaly = phalloidin_488_binary(image, mu=500, sigma=70,
-                                               cutoff=0, gain=100)
+    >>> image = plt.imread('C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
+    >>> label_image = phalloidin_488_binary(image, mu=500, sigma=70,
+                                            cutoff=0, gain=100)
 
     """
     # contrast adjustment
@@ -108,17 +221,30 @@ def phalloidin_488_segment(im, mu=500, sigma=70, cutoff=0, gain=100,
     thresh = threshold_otsu(im_lo, nbins=256)
     im_bin = im_lo > thresh
 
-    # remove small objects
-    im_bin_clean = remove_small_objects(im_bin, min_size=min_size,
-                                        connectivity=connectivity,
-                                        in_place=False)
+    # fill holes, separate cells, and remove small/large objects
+    im_fill = ndimage.binary_fill_holes(im_bin)
+    im_close = closing(im_fill, selem)
+    im_clean_i = remove_small_objects(im_close, min_size=min_size,
+                                      connectivity=connectivity, in_place=False)
+    im_clean = remove_large_objects(im_clean_i, max_size=max_size,
+                                    connectivity=connectivity, in_place=False)
+
     # labelling regions that are cells
-    label_image = label(im_bin_clean)
+    label_image = label(im_clean)
 
     # coloring labels over cells
     image_label_overlay = label2rgb(label_image, image=im, bg_label=0)
+    print(image_label_overlay.shape)
 
-    return label_image, image_label_overlay
+    # plot overlay image
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.imshow(image_label_overlay)
+
+    ax.set_axis_off()
+    plt.tight_layout()
+    plt.show()
+
+    return (label_image)
 
 
 def colorize(image, i, x):
@@ -275,7 +401,7 @@ def enhance_nucleis(image, open_selem=disk(5), image_display=True):
     """
     Highlight nucleis in the image.
     Make a sharp contrast between nucleis and background to highlight nucleis
-    in the input image, achieved by opening, dilation, sobel, watershed, and threshod. 
+    in the input image, achieved by opening, dilation, sobel, watershed, and threshod.
     Selem have default values while could be customize by user.
 
     Parameters
@@ -295,11 +421,11 @@ def enhance_nucleis(image, open_selem=disk(5), image_display=True):
     """
 
     im1 = img_as_ubyte(image)
-    im_open = m.opening(im1, open_selem)
-    elevation_map = img_as_ubyte(m.dilation(sobel(im_open)), disk(4))
-    im2 = m.watershed(elevation_map, im_open)
-    im22 = (im2 > otsu(im2))*1
-    im3 = m.erosion((fillholes(elevation_map))*1, disk(2))
+    im_open = opening(im1, open_selem)
+    elevation_map = img_as_ubyte(dilation(sobel(im_open)), disk(4))
+    im2 = watershed(elevation_map, im_open)
+    im22 = (im2 > threshold_otsu(im2))*1
+    im3 = erosion((fillholes(elevation_map))*1, disk(2))
 
     if image_display == True:
         fig, ax = plt.subplots(1, 2, figsize=(12, 6))

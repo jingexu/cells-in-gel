@@ -1,6 +1,10 @@
+import matplotlib.pyplot as plt
 import pandas as pd
-from skimage.measure import regionprops_table
-from skimage.color import label2rgb
+import numpy as np
+from skimage.measure import regionprops, regionprops_table
+from skimage.color import label2rgb, rgb2gray
+from scipy.ndimage import label
+from preprocess import enhance_nucleis
 
 
 def im_properties(label, im):
