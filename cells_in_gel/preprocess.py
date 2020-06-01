@@ -62,7 +62,7 @@ def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
     Signature: phalloidin_labeled(*args)
     Docstring: Segment and label image
 
-    Extended Summary
+    Extended Summary 
     ----------------
     The colorize function applies preprocessing filters (contrast and high
     pass) then defines the threshold value for the desired image. Thresholding
