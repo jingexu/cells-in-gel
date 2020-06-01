@@ -29,7 +29,7 @@ def im_properties(label, im):
     '''
     # define properties of interest
     props = ('area', 'major_axis_length', 'minor_axis_length', 'mean_intensity',
-             'eccentricity', 'extent', 'coords')
+             'eccentricity', 'extent', 'coords', 'centroid')
 
     # place in pandas dataframe
     regions = pd.DataFrame(regionprops_table(label, im, props))

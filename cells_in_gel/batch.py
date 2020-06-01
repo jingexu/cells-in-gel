@@ -90,6 +90,47 @@ def labels_regions(files, selem=disk(3), min_size=250):
 
     return regions
 
+def labels_SMA(files, selem=disk(3), min_size=250):
+    '''
+    This function labels objects in max projections and returns region
+    properties for each image in a dictionary.
+
+    Parameters
+    ----------
+    files : list, str
+        A list of filenames each corresponding to z-stack images.
+    selem : numpy.ndarray, optional
+        Area used for separating cells. Default value is
+        skimage.morphology.disk(3).
+    min_size : int, optional
+        The smallest allowable object size. Default value is 250.
+
+    Returns
+    -------
+    dictionary with filename as the key and region properties dataframe as
+    the entry
+
+    Example
+    -------
+    files = glob.glob('*.tif')
+    regions = labels_regions(files)
+    '''
+    # create empty dictionaries
+    labels = {}
+    regions = {}
+
+    # find max projection
+    max_proj = max_projection(files)
+
+    # preprocessing and segmentation
+    for file in files:
+        labels[file] = pp.SMA_segment(max_proj[file])
+
+    # extract region properties
+    for file in files:
+        regions[file] = props.im_properties(labels[file], max_proj[file])
+
+    return regions
 
 def image_summaries(files, properties, titles, regions):
     '''
@@ -161,3 +202,36 @@ def image_summaries(files, properties, titles, regions):
     df = df_r.drop(columns=['index'])
 
     return df
+
+
+def mergeDict(dict1, dict2):
+    '''This funciton returns a merged dictionary that summarizes average values and
+    variance for each max projection. It checks if the dictionaries have the same key values and assigns
+    the values corresponding to the same key to the same key.
+
+    Paramters
+    ---------
+    dict1: dict
+        The first dictionary to be merged containing one type of average value.
+    dict2: dict
+        The second dictionary to be merged containt the other type of average value.
+    
+    Returns
+    -------
+    dict3: dict
+        A dictionary that combines dict1 and dict2.
+
+    Example
+    -------
+    dict1 = {key1: value1, key2:value2}
+    dict2 = {key1: value3, key2: value4}
+    
+    dict 3 = {key1: [value1, value3], key2:[value2, value4]}.
+    '''
+    
+    dict3 = {**dict1, **dict2}
+    for key, value in dict3.items():
+        if key in dict1 and key in dict2:
+            dict3[key] = [value , dict1[key]]
+ 
+    return dict3
