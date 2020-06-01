@@ -142,6 +142,7 @@ def image_summaries(files, properties, titles, regions):
             avg.append(var_prop)
 
         # average properties with max projection into dictionary
+        avg.append(len(regions[file]))
         summary[file] = avg
 
     for prop in properties:
@@ -154,6 +155,8 @@ def image_summaries(files, properties, titles, regions):
         # append titles to include properties with variance
         titles.append(prop)
         titles.append(var)
+
+    titles.append('num_objects')
 
     # create pandas dataframe
     df_avg = pd.DataFrame.from_dict(summary, orient='index', columns=titles)
