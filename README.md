@@ -1,4 +1,4 @@
-# Cells-in-gel,image analysis to study the influence of environment on cell fate
+# Cells-in-gel,image analysis to evaluate the effects of a 3D environment on cells' spreading and expression of proteins
 ## Overall project description: 
 This is the repo of team Cells-in-gel. Most of us work in the DeForest group, studying how biomaterials can influence cell behavior. As such, this project analyzes how functionalizing poly(ethylene glycol) hydrogels with the adhesion motif RGD in different concentrations affects cell spreading and proliferation of fibroblasts. We will design a pipeline for processing fluorescent images taken on a Leica confocal. 
 
