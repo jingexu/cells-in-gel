@@ -11,6 +11,8 @@ from skimage.measure import label
 from skimage.morphology import closing, square, disk, remove_small_objects
 from skimage.color import label2rgb
 from skimage.transform import rescale
+import os
+from os.path import join
 
 
 def frequency_filter(im, mu, sigma, passtype='low'):
