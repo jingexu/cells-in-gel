@@ -1,10 +1,15 @@
-# cells-in-gel
+# Cells-in-gel,image analysis to evaluate the effects of a 3D environment on cells' spreading and expression of proteins
 ## Overall project description: 
-This is the repo of team Cells-in-gels. Most of us work in the DeForest group, studying how biomaterials can influence cell behavior. As such, this project analyzes how functionalizing poly(ethylene glycol) hydrogels with the adhesion motif RGD in different concentrations affects cell spreading and proliferation of fibroblasts. We will design a pipeline for processing fluorescent images taken on a Leica confocal. 
+This is the repo of team Cells-in-gel. Most of us work in the DeForest group, studying how biomaterials can influence cell behavior. As such, this project analyzes how functionalizing poly(ethylene glycol) hydrogels with the adhesion motif RGD in different concentrations affects cell spreading and proliferation of fibroblasts. We will design a pipeline for processing fluorescent images taken on a Leica confocal. 
+
+
+## Prerequisites
+Python is the primary software for the 'cells-in-gel'. We recommend python 3.7 or higher version here. Meanwhile, serval python packages are also required in advance. They are pandas, numpy, scikit-image, matplotlib, and scipy, and can be easily installed by using conda, a package and environment control system. 
 
 
 ## Installation
-In order to run cells-in-gel, clone the repository onto your local computer. Packages required by this project are: matplotlib, scikit-image, and numpy. 
+Jump to a directory or create a new one where you want to save cells-in-gel and then type the following command to get formulation:
+git clone https://github.com/jingexu/cells-in-gel.git
 
 ## Overview of scripts and functions:
 We import z-stacks of a hydrogel from three different channels from the Leica confocal. 
@@ -19,3 +24,7 @@ For channel 1, we write a script and functions to sharpen and isolate the nuclei
 ## Use cases:
 This program is designed for evaluating the effects of a 3D environment on cells' spreading and expression of proteins. The use of channel 3 can be adapted. For instance, one could measure extracellular matrix protein (i.e. collagen, laminin, fibronectin) deposition intensity, or the expression of Postn (another fibroblast activation marker). 
 ![Fibroblasts stained for Collagen I](0.5mM_BMB_maxproj_01.tif)
+
+
+## License
+ [MIT](https://en.wikipedia.org/wiki/MIT_License) - see [LICENSE](https://github.com/jingexu/cells-in-gel/blob/master/LICENSE) for details.
