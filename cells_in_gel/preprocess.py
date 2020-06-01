@@ -1,15 +1,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import ndimage
+from scipy.ndimage import binary_fill_holes as fillholes
 
 from skimage import img_as_ubyte
 from skimage.util import img_as_float
 from skimage.exposure import adjust_sigmoid
-from skimage.filters import threshold_otsu, threshold_triangle, rank, laplace
+from skimage.filters import threshold_otsu, threshold_triangle, rank, laplace, sobel
 from skimage.segmentation import clear_border
 from skimage.measure import label
 from skimage.morphology import closing, square, disk, remove_small_objects, opening, dilation, watershed, erosion
-from skimage.color import label2rgb
+from skimage.color import label2rgb, rgb2gray
 from skimage.transform import rescale
 import os
 from os.path import join
@@ -323,7 +324,7 @@ def enhance_nucleis(image, open_selem=disk(5), image_display=True):
     im_open = opening(im1, open_selem)
     elevation_map = img_as_ubyte(dilation(sobel(im_open)), disk(4))
     im2 = watershed(elevation_map, im_open)
-    im22 = (im2 > otsu(im2))*1
+    im22 = (im2 > threshold_otsu(im2))*1
     im3 = erosion((fillholes(elevation_map))*1, disk(2))
 
     if image_display == True:
