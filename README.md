@@ -24,3 +24,7 @@ For channel 1, we write a script and functions to sharpen and isolate the nuclei
 ## Use cases:
 This program is designed for evaluating the effects of a 3D environment on cells' spreading and expression of proteins. The use of channel 3 can be adapted. For instance, one could measure extracellular matrix protein (i.e. collagen, laminin, fibronectin) deposition intensity, or the expression of Postn (another fibroblast activation marker). 
 ![Fibroblasts stained for Collagen I](0.5mM_BMB_maxproj_01.tif)
+
+
+## License
+MIT - see LICENSE for details.
