@@ -59,17 +59,30 @@ def frequency_filter(im, mu, sigma, passtype='low'):
     return im_pass
 
 
-def phalloidin_488_segment(im, mu=500, sigma=70, cutoff=0, gain=100,
-                           min_size=250, connectivity=1):
+def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
+                       min_size=250, connectivity=1):
     """
-    This function binarizes a phalloidin 488 fluorescence microscopy channel
-    using contrast adjustment, high pass filter, otsu thresholding, and removal
-    of small objects.
+    Signature: phalloidin_labeled(*args)
+    Docstring: Segment and label image
+
+    Extended Summary
+    ----------------
+    The colorize function applies preprocessing filters (contrast and high
+    pass) then defines the threshold value for the desired image. Thresholding
+    is calculated by the otsu function creates a binarized image by setting
+    pixel intensities above that thresh value to white, and the ones below to
+    black (background). Next, it cleans up the image by filling in random noise
+    within the cell outlines and removes small background objects. It then
+    labels adjacent pixels with the same value and defines them as a region.
+    It returns an RGB image with color-coded labels.
 
     Paramters
     ---------
     im : (N, M) ndarray
         Grayscale input image.
+    selem : numpy.ndarray, optional
+        Area used for separating cells. Default value is
+        skimage.morphology.disk(3).
     cutoff : float, optional
         Cutoff of the sigmoid function that shifts the characteristic curve
         in horizontal direction. Default value is 0.
@@ -88,14 +101,13 @@ def phalloidin_488_segment(im, mu=500, sigma=70, cutoff=0, gain=100,
 
     Returns
     -------
-    out : label_image (ndarray) segmented and object labeled for analysis,
-        image_label_overlay (ndarray)
+    out : label_image (ndarray) segmented and object labeled for analysis
 
     Examples
     --------
-    >>> image = plt.imread('..\C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
-    >>> label, overaly = phalloidin_488_binary(image, mu=500, sigma=70,
-                                               cutoff=0, gain=100)
+    >>> image = plt.imread('C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
+    >>> label_image = phalloidin_488_binary(image, mu=500, sigma=70,
+                                            cutoff=0, gain=100)
 
     """
     # contrast adjustment
@@ -108,17 +120,28 @@ def phalloidin_488_segment(im, mu=500, sigma=70, cutoff=0, gain=100,
     thresh = threshold_otsu(im_lo, nbins=256)
     im_bin = im_lo > thresh
 
-    # remove small objects
-    im_bin_clean = remove_small_objects(im_bin, min_size=min_size,
-                                        connectivity=connectivity,
-                                        in_place=False)
+    # fill holes, separate cells, and remove small objects
+    im_fill = ndimage.binary_fill_holes(im_bin)
+    im_open = opening(im_fill, selem)
+    im_clean = remove_small_objects(im_open, min_size=min_size,
+                                    connectivity=connectivity, in_place=False)
+
     # labelling regions that are cells
-    label_image = label(im_bin_clean)
+    label_image = label(im_clean)
 
     # coloring labels over cells
     image_label_overlay = label2rgb(label_image, image=im, bg_label=0)
+    print(image_label_overlay.shape)
 
-    return label_image, image_label_overlay
+    # plot overlay image
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.imshow(image_label_overlay)
+
+    ax.set_axis_off()
+    plt.tight_layout()
+    plt.show()
+
+    return (label_image)
 
 
 def colorize(image, i, x):
@@ -275,7 +298,7 @@ def enhance_nucleis(image, open_selem=disk(5), image_display=True):
     """
     Highlight nucleis in the image.
     Make a sharp contrast between nucleis and background to highlight nucleis
-    in the input image, achieved by opening, dilation, sobel, watershed, and threshod. 
+    in the input image, achieved by opening, dilation, sobel, watershed, and threshod.
     Selem have default values while could be customize by user.
 
     Parameters
