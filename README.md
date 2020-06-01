@@ -27,4 +27,4 @@ This program is designed for evaluating the effects of a 3D environment on cells
 
 
 ## License
-MIT - see LICENSE for details.
+ [MIT](https://en.wikipedia.org/wiki/MIT_License) - see [LICENSE](https://github.com/jingexu/cells-in-gel/blob/master/LICENSE) for details.
