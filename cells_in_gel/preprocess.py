@@ -6,8 +6,9 @@ from skimage import img_as_ubyte
 from skimage.exposure import adjust_sigmoid
 from skimage.filters import threshold_otsu, rank, laplace
 from skimage.measure import label
-from skimage.morphology import square, disk, remove_small_objects, opening
+from skimage.morphology import square, disk, remove_small_objects, closing
 from skimage.color import label2rgb
+from scipy import ndimage as ndi
 
 
 def frequency_filter(im, mu, sigma, passtype='low'):
@@ -56,13 +57,108 @@ def frequency_filter(im, mu, sigma, passtype='low'):
     return im_pass
 
 
+def _check_dtype_supported(ar):
+    '''
+    Used in remove_large_objects function and taken from
+    skimage.morphology package.
+    '''
+    # Should use `issubdtype` for bool below, but there's a bug in numpy 1.7
+    if not (ar.dtype == bool or np.issubdtype(ar.dtype, np.integer)):
+        raise TypeError("Only bool or integer image types are supported. "
+                        "Got %s." % ar.dtype)
+
+
+def remove_large_objects(ar, max_size=10000, connectivity=1, in_place=False):
+    '''
+    Remove connected components larger than the specified size. (Modified from
+    skimage.morphology.remove_small_objects)
+
+    Parameters
+    ----------
+    ar : ndarray (arbitrary shape, int or bool type)
+        The array containing the connected components of interest. If the array
+        type is int, it is assumed that it contains already-labeled objects.
+        The ints must be non-negative.
+    max_size : int, optional (default: 10000)
+        The largest allowable connected component size.
+    connectivity : int, {1, 2, ..., ar.ndim}, optional (default: 1)
+        The connectivity defining the neighborhood of a pixel.
+    in_place : bool, optional (default: False)
+        If `True`, remove the connected components in the input array itself.
+        Otherwise, make a copy.
+    Raises
+    ------
+    TypeError
+        If the input array is of an invalid type, such as float or string.
+    ValueError
+        If the input array contains negative values.
+    Returns
+    -------
+    out : ndarray, same shape and type as input `ar`
+        The input array with small connected components removed.
+    Examples
+    --------
+    >>> from skimage import morphology
+    >>> a = np.array([[0, 0, 0, 1, 0],
+    ...               [1, 1, 1, 0, 0],
+    ...               [1, 1, 1, 0, 1]], bool)
+    >>> b = morphology.remove_large_objects(a, 6)
+    >>> b
+    array([[False, False, False, False, False],
+           [ True,  True,  True, False, False],
+           [ True,  True,  True, False, False]], dtype=bool)
+    >>> c = morphology.remove_small_objects(a, 7, connectivity=2)
+    >>> c
+    array([[False, False, False,  True, False],
+           [ True,  True,  True, False, False],
+           [ True,  True,  True, False, False]], dtype=bool)
+    >>> d = morphology.remove_large_objects(a, 6, in_place=True)
+    >>> d is a
+    True
+    '''
+    # Raising type error if not int or bool
+    _check_dtype_supported(ar)
+
+    if in_place:
+        out = ar
+    else:
+        out = ar.copy()
+
+    if max_size == 0:  # shortcut for efficiency
+        return out
+
+    if out.dtype == bool:
+        selem = ndi.generate_binary_structure(ar.ndim, connectivity)
+        ccs = np.zeros_like(ar, dtype=np.int32)
+        ndi.label(ar, selem, output=ccs)
+    else:
+        ccs = out
+
+    try:
+        component_sizes = np.bincount(ccs.ravel())
+    except ValueError:
+        raise ValueError("Negative value labels are not supported. Try "
+                         "relabeling the input with `scipy.ndimage.label` or "
+                         "`skimage.morphology.label`.")
+
+    if len(component_sizes) == 2:
+        warn("Only one label was provided to `remove_small_objects`. "
+             "Did you mean to use a boolean array?")
+
+    too_large = component_sizes > max_size
+    too_large_mask = too_large[ccs]
+    out[too_large_mask] = 0
+
+    return out
+
+
 def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
-                       min_size=250, connectivity=1):
+                       min_size=250, max_size=10000, connectivity=1):
     """
     Signature: phalloidin_labeled(*args)
     Docstring: Segment and label image
 
-    Extended Summary 
+    Extended Summary
     ----------------
     The colorize function applies preprocessing filters (contrast and high
     pass) then defines the threshold value for the desired image. Thresholding
@@ -92,6 +188,8 @@ def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
         Standard deviation for input in low pass filter. Default value is 70.
     min_size : int, optional
         The smallest allowable object size. Default value is 250.
+    max_size : int, optional
+        The largest allowable object size. Default value is 10000.
     connectivity : int, optional
         The connectvitivy defining the neighborhood of a pixel. Default value
         is 1.
@@ -115,13 +213,14 @@ def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
 
     # contrast + low pass + binary
     thresh = threshold_otsu(im_lo, nbins=256)
-    # thresh = threshold_triangle(im)
     im_bin = im_lo > thresh
 
-    # fill holes, separate cells, and remove small objects
+    # fill holes, separate cells, and remove small/large objects
     im_fill = ndimage.binary_fill_holes(im_bin)
-    im_open = opening(im_fill, selem)
-    im_clean = remove_small_objects(im_open, min_size=min_size,
+    im_close = closing(im_fill, selem)
+    im_clean_i = remove_small_objects(im_close, min_size=min_size,
+                                      connectivity=connectivity, in_place=False)
+    im_clean = remove_large_objects(im_clean_i, max_size=max_size,
                                     connectivity=connectivity, in_place=False)
 
     # labelling regions that are cells
