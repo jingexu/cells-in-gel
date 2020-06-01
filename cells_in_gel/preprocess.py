@@ -8,7 +8,7 @@ from skimage.exposure import adjust_sigmoid
 from skimage.filters import threshold_otsu, threshold_triangle, rank, laplace
 from skimage.segmentation import clear_border
 from skimage.measure import label
-from skimage.morphology import closing, square, disk, remove_small_objects
+from skimage.morphology import closing, square, disk, remove_small_objects, opening, dilation, watershed, erosion
 from skimage.color import label2rgb
 from skimage.transform import rescale
 import os
@@ -320,11 +320,11 @@ def enhance_nucleis(image, open_selem=disk(5), image_display=True):
     """
 
     im1 = img_as_ubyte(image)
-    im_open = m.opening(im1, open_selem)
-    elevation_map = img_as_ubyte(m.dilation(sobel(im_open)), disk(4))
-    im2 = m.watershed(elevation_map, im_open)
+    im_open = opening(im1, open_selem)
+    elevation_map = img_as_ubyte(dilation(sobel(im_open)), disk(4))
+    im2 = watershed(elevation_map, im_open)
     im22 = (im2 > otsu(im2))*1
-    im3 = m.erosion((fillholes(elevation_map))*1, disk(2))
+    im3 = erosion((fillholes(elevation_map))*1, disk(2))
 
     if image_display == True:
         fig, ax = plt.subplots(1, 2, figsize=(12, 6))
