@@ -205,15 +205,14 @@ def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
 
     Examples
     --------
-<<<<<<< HEAD
-    >>> image = plt.imread('C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
-    >>> label_image = phalloidin_488_binary(image, mu=500, sigma=70,
+
+    image = plt.imread('C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
+    label_image = phalloidin_488_binary(image, mu=500, sigma=70,
                                             cutoff=0, gain=100)
-=======
-    >>> image = plt.imread('..\C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
-    >>> label, overlay = phalloidin_488_segment(image, mu=500, sigma=70,
+
+    image = plt.imread('..\C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
+    label, overlay = phalloidin_488_segment(image, mu=500, sigma=70,
                                                cutoff=0, gain=100)
->>>>>>> red_channel
 
     """
     # contrast adjustment
