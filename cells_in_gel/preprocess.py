@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import ndimage
 from scipy.ndimage import binary_fill_holes as fillholes
-
 from skimage import img_as_ubyte
 from skimage.util import img_as_float
 from skimage.exposure import adjust_sigmoid
@@ -206,9 +205,14 @@ def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
 
     Examples
     --------
-    >>> image = plt.imread('C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
-    >>> label_image = phalloidin_488_binary(image, mu=500, sigma=70,
+
+    image = plt.imread('C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
+    label_image = phalloidin_488_binary(image, mu=500, sigma=70,
                                             cutoff=0, gain=100)
+
+    image = plt.imread('..\C3-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
+    label, overlay = phalloidin_488_segment(image, mu=500, sigma=70,
+                                               cutoff=0, gain=100)
 
     """
     # contrast adjustment
@@ -246,6 +250,66 @@ def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
 
     return (label_image)
 
+def SMA_segment(im, mu=500, sigma=70, cutoff=0, gain=100,
+                           min_size=100, connectivity=1):
+    """
+    This function binarizes a Smooth muscle actin (SMA) fluorescence microscopy channel
+    using contrast adjustment, high pass filter, otsu thresholding, and removal
+    of small objects.
+
+    Paramters
+    ---------
+    im : (N, M) ndarray
+        Grayscale input image.
+    cutoff : float, optional
+        Cutoff of the sigmoid function that shifts the characteristic curve
+        in horizontal direction. Default value is 0.
+    gain : float, optional
+        The constant multiplier in exponential's power of sigmoid function.
+        Default value is 100.
+    mu : float, optional
+        Average for input in low pass filter. Default value is 500.
+    sigma : float, optional
+        Standard deviation for input in low pass filter. Default value is 70.
+    min_size : int, optional
+        The smallest allowable object size. Default value is 100.
+    connectivity : int, optional
+        The connectvitivy defining the neighborhood of a pixel. Default value
+        is 1.
+
+    Returns
+    -------
+    out : label_image (ndarray) segmented and object labeled for analysis,
+        image_label_overlay (ndarray)
+
+    Examples
+    --------
+    >>> image = plt.imread('..\C4-NTG-CFbs_NTG5ECM_1mMRGD_20x_003.tif')
+    >>> label, overlay = SMA_segment(image, mu=500, sigma=70,
+                                               cutoff=0, gain=100)
+
+    """
+    # contrast adjustment
+    im_con = adjust_sigmoid(im, cutoff=cutoff, gain=gain, inv=False)
+
+    # contrast + low pass filter
+    im_lo = frequency_filter(im_con, mu, sigma, passtype='low')
+
+    # contrast + low pass + binary
+    thresh = threshold_otsu(im_lo, nbins=256)
+    im_bin = im_lo > thresh
+
+    # remove small objects
+    im_bin_clean = remove_small_objects(im_bin, min_size=min_size,
+                                        connectivity=connectivity,
+                                        in_place=False)
+    # labelling regions that are cells
+    label_image = label(im_bin_clean)
+
+    # coloring labels over cells
+    image_label_overlay = label2rgb(label_image, image=im, bg_label=0)
+
+    return label_image, image_label_overlay
 
 def colorize(image, i, x):
     """
@@ -441,14 +505,16 @@ def enhance_nucleis(image, open_selem=disk(5), image_display=True):
     return im22
 
 
-def list_of_images(image_channel):
+def list_of_images(image_channel, mypath):
     """
     Automatically extract all the images belonging to a channel into a list
 
     Parameters
     ----------
     image_channel : str
-        the channel of which user wants to extract images
+        the channel of which user wants to extract images.
+    mypath : str
+        path name where images are located.
     ----------
 
     Returns
@@ -456,7 +522,7 @@ def list_of_images(image_channel):
     Return to a list composed of all images belonging to a channel
 
     """
-    mypath = '/content/drive/My Drive/Fibroblasts in PEG Gels with NTG I61Q exm/20x TIFFs/Channel Separated'
+    #mypath = '/Users/irinakopyeva/documents/Channel_Separated'
     namelist = []
     tifflist = []
     for root, dirs, files in os.walk(mypath):
