@@ -5,6 +5,7 @@ This is the repo of team Cells-in-gel. Most of us work in the DeForest group, st
 
 ## Prerequisites
 Python is the primary software for the 'cells-in-gel'. We recommend python 3.7 or higher version here. Meanwhile, serval python packages are also required in advance. They are pandas, numpy, scikit-image, matplotlib, and scipy, and can be easily installed by using conda, a package and environment control system. 
+Additionally, if wanting to explore the zstack 3D functionality, mayavi will have to be installed on your machine. Refer to [here](https://docs.enthought.com/mayavi/mayavi/installation.html) for details on proper installation as well as other prerequisite packages.
 
 
 ## Installation
