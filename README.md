@@ -19,7 +19,7 @@ We import z-stacks of a hydrogel from three different channels from the Leica co
 
 However, channel 3, which is used to measure the protein expression level can be adapted for other proteins. 
 
-For channel 1, we write a script and functions to sharpen and isolate the nuclei from the background to count the number of cells. For channel 2, we set a threshold to separate the actin filaments (which basically outline the cytoplasm of the nucleus) from the background, binarize the image, and then calculate the area and extension of the cells. For channel 3, we quantify the intensity of the aSMA, which can then be normalized against the number of cells calculated in channel 1.
+For channel 1, we write a script and functions to sharpen and isolate the nuclei from the background to count the number of cells. For channel 2, we set a threshold to separate the actin filaments (which basically outline the cytoplasm of the nucleus) from the background, binarize the image, and then calculate the area and extension of the cells. For channel 3, we quantify the intensity of the aSMA in each max projection.
 
 ## Use cases:
 This program is designed for evaluating the effects of a 3D environment on cells' spreading and expression of proteins. The use of channel 3 can be adapted. For instance, one could measure extracellular matrix protein (i.e. collagen, laminin, fibronectin) deposition intensity, or the expression of Postn (another fibroblast activation marker). 
