@@ -227,8 +227,8 @@ def phalloidin_labeled(im, selem=disk(3), mu=500, sigma=70, cutoff=0, gain=100,
 
     # fill holes, separate cells, and remove small/large objects
     im_fill = ndimage.binary_fill_holes(im_bin)
-    im_close = closing(im_fill, selem)
-    im_clean_i = remove_small_objects(im_close, min_size=min_size,
+    im_open = opening(im_fill, selem)
+    im_clean_i = remove_small_objects(im_open, min_size=min_size,
                                       connectivity=connectivity, in_place=False)
     im_clean = remove_large_objects(im_clean_i, max_size=max_size,
                                     connectivity=connectivity, in_place=False)
