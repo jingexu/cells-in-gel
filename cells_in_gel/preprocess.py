@@ -505,14 +505,16 @@ def enhance_nucleis(image, open_selem=disk(5), image_display=True):
     return im22
 
 
-def list_of_images(image_channel):
+def list_of_images(image_channel, mypath):
     """
     Automatically extract all the images belonging to a channel into a list
 
     Parameters
     ----------
     image_channel : str
-        the channel of which user wants to extract images
+        the channel of which user wants to extract images.
+    mypath : str
+        path name where images are located.
     ----------
 
     Returns
@@ -520,7 +522,7 @@ def list_of_images(image_channel):
     Return to a list composed of all images belonging to a channel
 
     """
-    mypath = '$$$$PATH NAME HERE$$$$$'
+    #mypath = '/Users/irinakopyeva/documents/Channel_Separated'
     namelist = []
     tifflist = []
     for root, dirs, files in os.walk(mypath):

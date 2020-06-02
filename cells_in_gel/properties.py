@@ -4,7 +4,8 @@ import numpy as np
 from skimage.measure import regionprops, regionprops_table
 from skimage.color import label2rgb, rgb2gray
 from scipy.ndimage import label
-from preprocess import enhance_nucleis
+from cells_in_gel import preprocess as pp
+from cells_in_gel.preprocess import enhance_nucleis
 
 
 def im_properties(label, im):
