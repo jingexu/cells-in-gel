@@ -1,5 +1,22 @@
 def zlink(df):
-    
+    '''
+     This function takes a dataframe from an image z-stack and counts objects nearby each other, 
+     lumping them together as one cell if within a specified Euclidean distance.
+
+    Parameters
+    ----------
+    df : pandas dataframe
+        a dataframe corresponding to the labelled objects in the image.
+
+    Returns
+    -------
+    df: dataframe with cells now labelled across all z-stacks.
+
+    Example
+    -------
+    df = cells_in_gel.properties(label, im)
+    df = cells_in_gel.zstack.zlink(files)
+    '''
     def dist(a, b):
         v = ((b[0]-a[0])**2 + (b[1]-a[1])**2)**.5
         return v

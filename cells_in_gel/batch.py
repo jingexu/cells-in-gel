@@ -92,7 +92,7 @@ def labels_regions(files, selem=disk(3), min_size=250):
 
 def labels_SMA(files, selem=disk(3), min_size=250):
     '''
-    This function labels objects in max projections and returns region
+    This function labels objects in aSMA channel max projections and returns region
     properties for each image in a dictionary.
 
     Parameters
